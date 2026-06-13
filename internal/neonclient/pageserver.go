@@ -79,6 +79,18 @@ func (c *PageserverClient) CreateBranch(ctx context.Context, tenantID, newTimeli
 	})
 }
 
+// CreateBranchAtLSN branches at a specific ancestor LSN. Pinning the LSN makes
+// branch contents deterministic: callers first ensure the pageserver has
+// ingested up to this LSN (see api.waitAncestorIngested), so the branch
+// includes all WAL committed before it.
+func (c *PageserverClient) CreateBranchAtLSN(ctx context.Context, tenantID, newTimelineID, ancestorTimelineID, ancestorStartLSN string) error {
+	return c.expect2xx(ctx, http.MethodPost, "/v1/tenant/"+tenantID+"/timeline/", map[string]any{
+		"new_timeline_id":      newTimelineID,
+		"ancestor_timeline_id": ancestorTimelineID,
+		"ancestor_start_lsn":   ancestorStartLSN,
+	})
+}
+
 type TimelineDetail struct {
 	TimelineID         string `json:"timeline_id"`
 	LastRecordLSN      string `json:"last_record_lsn"`

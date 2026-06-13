@@ -87,6 +87,25 @@ func TestCreateBranchTimeline(t *testing.T) {
 	}
 }
 
+func TestCreateBranchAtLSN(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		if body["ancestor_timeline_id"] != anc || body["ancestor_start_lsn"] != "0/214F810" {
+			t.Errorf("body mismatch: %v", body)
+		}
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"timeline_id":"` + tlid + `"}`))
+	}))
+	defer srv.Close()
+
+	c := neonclient.NewPageserver(srv.URL)
+	if err := c.CreateBranchAtLSN(context.Background(), tid, tlid, anc, "0/214F810"); err != nil {
+		t.Fatalf("CreateBranchAtLSN: %v", err)
+	}
+}
+
 func TestGetTimelineDetail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/tenant/"+tid+"/timeline/"+tlid {
