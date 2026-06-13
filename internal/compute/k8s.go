@@ -79,10 +79,19 @@ func (r *K8sRuntime) buildPod(endpointID string) *corev1.Pod {
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever,
+			// The image runs as postgres (uid/gid 1000); fsGroup makes the
+			// emptyDir pgdata volume writable for it.
+			SecurityContext: &corev1.PodSecurityContext{
+				FSGroup: ptrInt64(1000),
+			},
 			Containers: []corev1.Container{{
 				Name:            "compute",
 				Image:           r.computeImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				// INSTANCE_ID enables compute_ctl's trusted-network mode: the
+				// external HTTP API (/status, /terminate) skips JWT auth. The
+				// pod network is only reachable by the control plane and proxy.
+				Env: []corev1.EnvVar{{Name: "INSTANCE_ID", Value: "fly-pgsql-" + endpointID}},
 				Command: []string{
 					"/usr/local/bin/compute_ctl",
 					"--pgdata", "/var/db/postgres/compute",
@@ -108,7 +117,9 @@ func (r *K8sRuntime) buildPod(endpointID string) *corev1.Pod {
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{Name: "config", MountPath: "/config"},
-					{Name: "pgdata", MountPath: "/var/db/postgres/compute"},
+					// Mounted at the parent: compute_ctl insists on creating
+					// the pgdata directory itself (fails if it pre-exists).
+					{Name: "pgdata", MountPath: "/var/db/postgres"},
 				},
 			}},
 			Volumes: []corev1.Volume{
@@ -128,6 +139,8 @@ func (r *K8sRuntime) buildPod(endpointID string) *corev1.Pod {
 		},
 	}
 }
+
+func ptrInt64(v int64) *int64 { return &v }
 
 func (r *K8sRuntime) Stop(ctx context.Context, endpointID string) error {
 	if err := r.client.CoreV1().Pods(r.namespace).Delete(ctx, podName(endpointID), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {

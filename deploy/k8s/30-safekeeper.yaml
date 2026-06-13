@@ -43,7 +43,8 @@ spec:
           ORD=${HOSTNAME##*-};
           exec safekeeper
           --id=$((ORD+1))
-          --listen-pg=${HOSTNAME}.safekeeper.fly-pgsql.svc.cluster.local:5454
+          --listen-pg=0.0.0.0:5454
+          --advertise-pg=${HOSTNAME}.safekeeper.fly-pgsql.svc.cluster.local:5454
           --listen-http=0.0.0.0:7676
           --broker-endpoint=http://storage-broker:50051
           -D /data

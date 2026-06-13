@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: controlplane
+  namespace: fly-pgsql
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controlplane
+  namespace: fly-pgsql
+rules:
+- apiGroups: [""]
+  resources: [pods, configmaps]
+  verbs: [get, list, watch, create, update, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: controlplane
+  namespace: fly-pgsql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: controlplane
+subjects:
+- kind: ServiceAccount
+  name: controlplane
+  namespace: fly-pgsql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controlplane
+  namespace: fly-pgsql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controlplane
+  template:
+    metadata:
+      labels:
+        app: controlplane
+    spec:
+      serviceAccountName: controlplane
+      containers:
+      - name: controlplane
+        image: fly-pgsql/controlplane:dev
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URL
+          value: postgres://flypgsql:flypgsql@statedb:5432/flypgsql
+        - name: NAMESPACE
+          value: fly-pgsql
+        - name: PAGESERVER_URL
+          value: http://pageserver:9898
+        - name: PAGESERVER_CONNSTRING
+          value: host=pageserver port=6400
+        - name: SAFEKEEPERS
+          value: safekeeper-0.safekeeper:5454,safekeeper-1.safekeeper:5454,safekeeper-2.safekeeper:5454
+        - name: COMPUTE_IMAGE
+          value: ghcr.io/neondatabase/compute-node-v17:release-compute-9073
+        - name: DOMAIN
+          value: db.127-0-0-1.sslip.io
+        - name: SUSPEND_CHECK_INTERVAL
+          value: 30s
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controlplane
+  namespace: fly-pgsql
+spec:
+  selector:
+    app: controlplane
+  ports:
+  - port: 8080

@@ -70,7 +70,7 @@ func TestStartCreatesConfigMapAndPod(t *testing.T) {
 		if vm.MountPath == "/config" {
 			hasConfigMount = true
 		}
-		if vm.MountPath == "/var/db/postgres/compute" {
+		if vm.MountPath == "/var/db/postgres" {
 			hasPgdataMount = true
 		}
 	}
