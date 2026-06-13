@@ -1,0 +1,5 @@
+bin/
+deploy/certs/
+*.key
+*.pem
+.env

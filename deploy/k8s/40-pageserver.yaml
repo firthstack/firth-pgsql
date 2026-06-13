@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pageserver-config
+  namespace: fly-pgsql
+data:
+  pageserver.toml: |
+    broker_endpoint='http://storage-broker:50051'
+    pg_distrib_dir='/usr/local/'
+    listen_pg_addr='0.0.0.0:6400'
+    listen_http_addr='0.0.0.0:9898'
+    remote_storage={ endpoint='http://minio:9000', bucket_name='neon', bucket_region='eu-north-1', prefix_in_bucket='/pageserver' }
+    control_plane_api='http://0.0.0.0:6666'
+    control_plane_emergency_mode=true
+  identity.toml: |
+    id=1234
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pageserver
+  namespace: fly-pgsql
+spec:
+  serviceName: pageserver
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pageserver
+  template:
+    metadata:
+      labels:
+        app: pageserver
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: copy-config
+        image: busybox:1.36
+        command: ["/bin/sh", "-c", "mkdir -p /work && cp /config-src/* /work/ && chmod a+r /work/*"]
+        volumeMounts:
+        - name: config
+          mountPath: /config-src
+        - name: data
+          mountPath: /work
+          subPath: neon
+      containers:
+      - name: pageserver
+        image: ghcr.io/neondatabase/neon:release-9129
+        command: ["pageserver", "-D", "/data/.neon"]
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: minio
+        - name: AWS_SECRET_ACCESS_KEY
+          value: password
+        ports:
+        - containerPort: 6400
+        - containerPort: 9898
+        volumeMounts:
+        - name: data
+          mountPath: /data/.neon
+          subPath: neon
+      volumes:
+      - name: config
+        configMap:
+          name: pageserver-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pageserver
+  namespace: fly-pgsql
+spec:
+  selector:
+    app: pageserver
+  ports:
+  - name: pg
+    port: 6400
+  - name: http
+    port: 9898

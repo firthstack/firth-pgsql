@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: safekeeper
+  namespace: fly-pgsql
+spec:
+  clusterIP: None
+  selector:
+    app: safekeeper
+  ports:
+  - name: pg
+    port: 5454
+  - name: http
+    port: 7676
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: safekeeper
+  namespace: fly-pgsql
+spec:
+  serviceName: safekeeper
+  replicas: 3
+  selector:
+    matchLabels:
+      app: safekeeper
+  template:
+    metadata:
+      labels:
+        app: safekeeper
+    spec:
+      containers:
+      - name: safekeeper
+        image: ghcr.io/neondatabase/neon:release-9129
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: minio
+        - name: AWS_SECRET_ACCESS_KEY
+          value: password
+        command: ["/bin/sh", "-c"]
+        args:
+        - >
+          ORD=${HOSTNAME##*-};
+          exec safekeeper
+          --id=$((ORD+1))
+          --listen-pg=0.0.0.0:5454
+          --advertise-pg=${HOSTNAME}.safekeeper.fly-pgsql.svc.cluster.local:5454
+          --listen-http=0.0.0.0:7676
+          --broker-endpoint=http://storage-broker:50051
+          -D /data
+          --remote-storage="{endpoint='http://minio:9000',bucket_name='neon',bucket_region='eu-north-1',prefix_in_bucket='/safekeeper/'}"
+        ports:
+        - containerPort: 5454
+        - containerPort: 7676
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 5Gi

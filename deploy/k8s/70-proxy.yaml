@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: fly-pgsql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      containers:
+      - name: proxy
+        image: ghcr.io/neondatabase/neon:release-9129
+        command:
+        - proxy
+        - --auth-backend=cplane-v1
+        - --auth-endpoint=http://controlplane:8080/proxy/api
+        - --proxy=0.0.0.0:4432
+        - --http=0.0.0.0:7001
+        - --mgmt=0.0.0.0:7000
+        - -c=/certs/tls.crt
+        - -k=/certs/tls.key
+        ports:
+        - containerPort: 4432
+        - containerPort: 7001
+        volumeMounts:
+        - name: tls
+          mountPath: /certs
+      volumes:
+      - name: tls
+        secret:
+          secretName: proxy-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy
+  namespace: fly-pgsql
+spec:
+  selector:
+    app: proxy
+  ports:
+  - name: pg
+    port: 4432
+  - name: http
+    port: 7001

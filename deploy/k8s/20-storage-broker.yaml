@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-broker
+  namespace: fly-pgsql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage-broker
+  template:
+    metadata:
+      labels:
+        app: storage-broker
+    spec:
+      containers:
+      - name: broker
+        image: ghcr.io/neondatabase/neon:release-9129
+        command: ["storage_broker", "--listen-addr=0.0.0.0:50051"]
+        ports:
+        - containerPort: 50051
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-broker
+  namespace: fly-pgsql
+spec:
+  selector:
+    app: storage-broker
+  ports:
+  - port: 50051
