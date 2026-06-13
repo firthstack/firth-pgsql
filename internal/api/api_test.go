@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/insforge/fly-pgsql/internal/api"
 	"github.com/insforge/fly-pgsql/internal/compute"
@@ -21,14 +22,15 @@ import (
 
 // fakePageserver records calls and can be told to fail.
 type fakePageserver struct {
-	mu        sync.Mutex
-	calls     []string
-	failAll   bool
-	srv       *httptest.Server
+	mu      sync.Mutex
+	calls   []string
+	deleted map[string]bool
+	failAll bool
+	srv     *httptest.Server
 }
 
 func newFakePageserver(t *testing.T) *fakePageserver {
-	f := &fakePageserver{}
+	f := &fakePageserver{deleted: map[string]bool{}}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.calls = append(f.calls, r.Method+" "+r.URL.Path)
@@ -46,10 +48,20 @@ func newFakePageserver(t *testing.T) *fakePageserver {
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte(`{"timeline_id":"x"}`))
 		case r.Method == http.MethodDelete:
+			f.mu.Lock()
+			f.deleted[r.URL.Path] = true
+			f.mu.Unlock()
 			w.WriteHeader(http.StatusAccepted)
-		default: // GET timeline detail (also used by delete polling)
+		default: // GET timeline detail (delete polling + usage)
 			if strings.Contains(r.URL.Path, "/timeline/") {
-				w.WriteHeader(http.StatusNotFound)
+				f.mu.Lock()
+				gone := f.deleted[r.URL.Path]
+				f.mu.Unlock()
+				if gone {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				w.Write([]byte(`{"timeline_id":"x","last_record_lsn":"0/1","current_logical_size":4096}`))
 				return
 			}
 			w.Write([]byte(`{}`))
@@ -105,7 +117,7 @@ func testServer(t *testing.T) (*api.Server, *fakePageserver, *stubWaker, *state.
 	srv := &api.Server{
 		Store:      store,
 		Pageserver: neonclient.NewPageserver(ps.srv.URL),
-		Runtime:    compute.NewK8sRuntime(nil, "fly-pgsql", "img"), // unused in these tests
+		Runtime:    compute.NewK8sRuntime(fake.NewClientset(), "fly-pgsql", "img"),
 		Waker:      waker,
 		Cfg: api.Config{
 			Domain:               "db.127-0-0-1.sslip.io",
@@ -200,6 +212,121 @@ func TestGetProject(t *testing.T) {
 	b := branches[0].(map[string]any)
 	if b["is_default"] != true || b["endpoint_id"] != created["endpoint_id"] {
 		t.Errorf("branch mismatch: %v", b)
+	}
+}
+
+func TestCreateBranch(t *testing.T) {
+	srv, ps, _, store := testServer(t)
+	h := srv.Routes()
+	_, proj := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "demo"})
+	projectID := proj["project_id"].(string)
+
+	rec, m := doJSON(t, h, http.MethodPost, "/v1/projects/"+projectID+"/branches", map[string]string{"name": "preview"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, k := range []string{"branch_id", "endpoint_id", "host", "connection_uri"} {
+		if m[k] == nil || m[k] == "" {
+			t.Errorf("missing %s: %v", k, m)
+		}
+	}
+	if m["password"] != nil {
+		t.Errorf("branch must not return a new password (role is project-wide): %v", m["password"])
+	}
+	// pageserver must have received a branch creation (2 timeline POSTs total)
+	if got := ps.callsMatching("POST"); got != 2 {
+		t.Errorf("expected 2 timeline POSTs, got %d", got)
+	}
+
+	b, err := store.GetBranchByID(context.Background(), m["branch_id"].(string))
+	if err != nil {
+		t.Fatalf("branch not persisted: %v", err)
+	}
+	if b.ParentBranchID == nil || *b.ParentBranchID != proj["branch_id"].(string) {
+		t.Errorf("parent branch: %v", b.ParentBranchID)
+	}
+	if b.IsDefault {
+		t.Error("new branch must not be default")
+	}
+}
+
+func TestCreateBranchFromBranch(t *testing.T) {
+	srv, _, _, store := testServer(t)
+	h := srv.Routes()
+	_, proj := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "demo"})
+	projectID := proj["project_id"].(string)
+	_, b1 := doJSON(t, h, http.MethodPost, "/v1/projects/"+projectID+"/branches", map[string]string{"name": "b1"})
+
+	rec, b2 := doJSON(t, h, http.MethodPost, "/v1/projects/"+projectID+"/branches",
+		map[string]string{"name": "b2", "parent_branch_id": b1["branch_id"].(string)})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	got, _ := store.GetBranchByID(context.Background(), b2["branch_id"].(string))
+	if got.ParentBranchID == nil || *got.ParentBranchID != b1["branch_id"].(string) {
+		t.Errorf("parent: %v", got.ParentBranchID)
+	}
+}
+
+func TestDeleteBranch(t *testing.T) {
+	srv, ps, _, store := testServer(t)
+	h := srv.Routes()
+	_, proj := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "demo"})
+	projectID := proj["project_id"].(string)
+	_, br := doJSON(t, h, http.MethodPost, "/v1/projects/"+projectID+"/branches", map[string]string{"name": "doomed"})
+
+	rec, _ := doJSON(t, h, http.MethodDelete, "/v1/projects/"+projectID+"/branches/"+br["branch_id"].(string), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status %d", rec.Code)
+	}
+	if _, err := store.GetBranchByID(context.Background(), br["branch_id"].(string)); err == nil {
+		t.Error("branch row still exists")
+	}
+	if ps.callsMatching("DELETE") < 1 {
+		t.Error("pageserver timeline delete not called")
+	}
+
+	// default branch cannot be deleted
+	rec, _ = doJSON(t, h, http.MethodDelete, "/v1/projects/"+projectID+"/branches/"+proj["branch_id"].(string), nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("deleting default branch must 400, got %d", rec.Code)
+	}
+}
+
+func TestDeleteProject(t *testing.T) {
+	srv, ps, _, store := testServer(t)
+	h := srv.Routes()
+	_, proj := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "demo"})
+	projectID := proj["project_id"].(string)
+	doJSON(t, h, http.MethodPost, "/v1/projects/"+projectID+"/branches", map[string]string{"name": "extra"})
+
+	rec, _ := doJSON(t, h, http.MethodDelete, "/v1/projects/"+projectID, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status %d", rec.Code)
+	}
+	if _, err := store.GetProjectByID(context.Background(), projectID); err == nil {
+		t.Error("project row still exists")
+	}
+	if ps.callsMatching("DELETE /v1/tenant/") < 1 {
+		t.Error("pageserver tenant delete not called")
+	}
+}
+
+func TestUsage(t *testing.T) {
+	srv, _, _, _ := testServer(t)
+	h := srv.Routes()
+	_, proj := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "demo"})
+	projectID := proj["project_id"].(string)
+
+	rec, m := doJSON(t, h, http.MethodGet, "/v1/projects/"+projectID+"/usage", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("usage status %d: %s", rec.Code, rec.Body.String())
+	}
+	if _, ok := m["total_logical_size_bytes"]; !ok {
+		t.Errorf("missing total: %v", m)
+	}
+	if _, ok := m["branches"]; !ok {
+		t.Errorf("missing branches: %v", m)
 	}
 }
 
