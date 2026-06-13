@@ -169,6 +169,34 @@ func TestWakeWhenRunningButPodGone(t *testing.T) {
 	}
 }
 
+// If the pod was recreated with a new IP while state still records the old
+// address, Wake must not return the stale address — it reconciles and restarts.
+func TestWakeRunningButPodIPChanged(t *testing.T) {
+	w, rt, store, ep := setup(t)
+	if _, err := w.Wake(context.Background(), ep); err != nil {
+		t.Fatal(err)
+	}
+	// Pod now reports a different IP than the stored addr (10.0.0.7:55433).
+	rt.mu.Lock()
+	rt.podIP = "10.0.0.99"
+	rt.mu.Unlock()
+
+	addr, err := w.Wake(context.Background(), ep)
+	if err != nil {
+		t.Fatalf("re-wake: %v", err)
+	}
+	if addr != "10.0.0.99:55433" {
+		t.Errorf("expected reconciled address with new IP, got %s", addr)
+	}
+	if rt.startCalls.Load() != 2 {
+		t.Errorf("expected restart on stale IP, start calls=%d", rt.startCalls.Load())
+	}
+	got, _ := store.GetEndpointByID(context.Background(), ep)
+	if got.ComputeAddr == nil || *got.ComputeAddr != "10.0.0.99:55433" {
+		t.Errorf("stored addr not updated: %+v", got.ComputeAddr)
+	}
+}
+
 func TestConcurrentWakeSingleStart(t *testing.T) {
 	w, rt, _, ep := setup(t)
 	const n = 10

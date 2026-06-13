@@ -56,6 +56,8 @@ func main() {
 	computeImage := env("COMPUTE_IMAGE", "ghcr.io/neondatabase/compute-node-v17:release-compute-9073")
 	domain := env("DOMAIN", "db.127-0-0-1.sslip.io")
 	listen := env("LISTEN", ":8080")
+	authToken := env("CONTROL_PLANE_AUTH_TOKEN", "")
+	enableDebug := env("ENABLE_DEBUG_ENDPOINTS", "") == "true"
 	suspendInterval, err := time.ParseDuration(env("SUSPEND_CHECK_INTERVAL", "30s"))
 	if err != nil {
 		slog.Error("bad SUSPEND_CHECK_INTERVAL", "err", err)
@@ -87,6 +89,14 @@ func main() {
 
 	store := state.New(pool)
 	pageserver := neonclient.NewPageserver(pageserverURL)
+	// Derive safekeeper HTTP endpoints (port 7676) from their pg connstrings
+	// (host:5454), used to read the committed LSN when branching.
+	safekeeperHTTP := make([]string, 0, len(safekeepers))
+	for _, sk := range safekeepers {
+		host, _, _ := strings.Cut(sk, ":")
+		safekeeperHTTP = append(safekeeperHTTP, "http://"+host+":7676")
+	}
+	safekeeper := neonclient.NewSafekeeper(safekeeperHTTP)
 	runtime := compute.NewK8sRuntime(kube, namespace, computeImage)
 
 	specBuilder := func(ctx context.Context, endpointID string) (compute.ComputeConfig, error) {
@@ -122,6 +132,7 @@ func main() {
 	apiServer := &api.Server{
 		Store:      store,
 		Pageserver: pageserver,
+		Safekeeper: safekeeper,
 		Runtime:    runtime,
 		Waker:      waker,
 		Cfg: api.Config{
@@ -129,6 +140,8 @@ func main() {
 			ProxyPort:            5432,
 			PageserverConnstring: pageserverConnstring,
 			Safekeepers:          safekeepers,
+			AuthToken:            authToken,
+			EnableDebug:          enableDebug,
 		},
 	}
 

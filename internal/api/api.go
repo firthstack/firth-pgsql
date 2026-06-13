@@ -4,14 +4,17 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/insforge/fly-pgsql/internal/compute"
 	"github.com/insforge/fly-pgsql/internal/ids"
+	"github.com/insforge/fly-pgsql/internal/lsn"
 	"github.com/insforge/fly-pgsql/internal/neonclient"
 	"github.com/insforge/fly-pgsql/internal/scram"
 	"github.com/insforge/fly-pgsql/internal/state"
@@ -23,16 +26,32 @@ type Waker interface {
 	Wake(ctx context.Context, endpointID string) (addr string, err error)
 }
 
+// SafekeeperLSN reports a timeline's quorum-committed LSN. Implemented by
+// neonclient.SafekeeperClient; stubbed in tests.
+type SafekeeperLSN interface {
+	MaxCommitLSN(ctx context.Context, tenantID, timelineID string) (string, error)
+}
+
 type Config struct {
 	Domain               string // e.g. db.127-0-0-1.sslip.io
 	ProxyPort            int    // client-facing port on the proxy (5432 via port-forward)
 	PageserverConnstring string
 	Safekeepers          []string
+	// AuthToken, when non-empty, requires "Authorization: Bearer <token>" on
+	// every /v1/* request. Empty disables the check (local dev). This is a
+	// coarse service-to-service guard; per-tenant InsForge JWT auth is future
+	// work (jwks integration, M4).
+	AuthToken string
+	// EnableDebug exposes the destructive /v1/debug/endpoints/* routes. Off by
+	// default; only the local-dev deployment turns it on (used by the
+	// integration tests). Never enable in a shared/production deployment.
+	EnableDebug bool
 }
 
 type Server struct {
 	Store      *state.Store
 	Pageserver *neonclient.PageserverClient
+	Safekeeper SafekeeperLSN
 	Runtime    compute.Runtime
 	Waker      Waker
 	Cfg        Config
@@ -40,16 +59,37 @@ type Server struct {
 
 func (s *Server) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/projects", s.createProject)
-	mux.HandleFunc("GET /v1/projects/{id}", s.getProject)
-	mux.HandleFunc("DELETE /v1/projects/{id}", s.deleteProject)
-	mux.HandleFunc("POST /v1/projects/{id}/branches", s.createBranch)
-	mux.HandleFunc("DELETE /v1/projects/{id}/branches/{bid}", s.deleteBranch)
-	mux.HandleFunc("GET /v1/projects/{id}/usage", s.usage)
-	mux.HandleFunc("POST /v1/debug/endpoints/{id}/start", s.debugStart)
-	mux.HandleFunc("POST /v1/debug/endpoints/{id}/stop", s.debugStop)
+	v1 := s.requireAuth
+	mux.HandleFunc("POST /v1/projects", v1(s.createProject))
+	mux.HandleFunc("GET /v1/projects/{id}", v1(s.getProject))
+	mux.HandleFunc("DELETE /v1/projects/{id}", v1(s.deleteProject))
+	mux.HandleFunc("POST /v1/projects/{id}/branches", v1(s.createBranch))
+	mux.HandleFunc("DELETE /v1/projects/{id}/branches/{bid}", v1(s.deleteBranch))
+	mux.HandleFunc("GET /v1/projects/{id}/usage", v1(s.usage))
+	if s.Cfg.EnableDebug {
+		mux.HandleFunc("POST /v1/debug/endpoints/{id}/start", v1(s.debugStart))
+		mux.HandleFunc("POST /v1/debug/endpoints/{id}/stop", v1(s.debugStop))
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
+}
+
+// requireAuth gates a handler behind the configured bearer token. When no
+// token is configured the handler is returned unchanged (local dev).
+func (s *Server) requireAuth(h http.HandlerFunc) http.HandlerFunc {
+	if s.Cfg.AuthToken == "" {
+		return h
+	}
+	want := "Bearer " + s.Cfg.AuthToken
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Constant-time compare to avoid leaking the token via timing.
+		got := r.Header.Get("Authorization")
+		if subtle.ConstantTimeCompare([]byte(got), []byte(want)) != 1 {
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		h(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -120,6 +160,11 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		slog.Error("persist project", "err", err)
+		// Compensate: drop the just-created tenant so we don't orphan storage
+		// resources. Best-effort — log if cleanup also fails.
+		if cerr := s.Pageserver.DeleteTenant(ctx, tenantID); cerr != nil {
+			slog.Error("cleanup orphaned tenant after persist failure", "tenant", tenantID, "err", cerr)
+		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -205,8 +250,12 @@ func (s *Server) createBranch(w http.ResponseWriter, r *http.Request) {
 	var parent *state.Branch
 	if req.ParentBranchID != "" {
 		parent, err = s.Store.GetBranchByID(ctx, req.ParentBranchID)
-		if err != nil || parent.ProjectID != p.ID {
+		if errors.Is(err, state.ErrNotFound) || (err == nil && parent.ProjectID != p.ID) {
 			writeErr(w, http.StatusBadRequest, "parent branch not found in project")
+			return
+		}
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	} else {
@@ -231,7 +280,17 @@ func (s *Server) createBranch(w http.ResponseWriter, r *http.Request) {
 	endpointID := ids.NewEndpointID()
 	timelineID := ids.NewHex32()
 
-	if err := s.Pageserver.CreateBranch(ctx, p.TenantID, timelineID, parent.TimelineID); err != nil {
+	// Branch at the parent's committed LSN, after the pageserver has ingested
+	// up to it. Without this, a branch created right after writes can miss
+	// recently-committed data (the pageserver lags the safekeepers' commit
+	// LSN by the streaming delay).
+	startLSN, err := s.waitAncestorIngested(ctx, p.TenantID, parent.TimelineID)
+	if err != nil {
+		slog.Error("wait ancestor ingested", "err", err)
+		writeErr(w, http.StatusBadGateway, "branch point not ready: "+err.Error())
+		return
+	}
+	if err := s.Pageserver.CreateBranchAtLSN(ctx, p.TenantID, timelineID, parent.TimelineID, startLSN); err != nil {
 		slog.Error("create branch timeline", "err", err)
 		writeErr(w, http.StatusBadGateway, "pageserver: "+err.Error())
 		return
@@ -243,6 +302,11 @@ func (s *Server) createBranch(w http.ResponseWriter, r *http.Request) {
 		state.Endpoint{ID: endpointID, BranchID: branchID, State: "suspended"},
 	)
 	if err != nil {
+		slog.Error("persist branch", "err", err)
+		// Compensate: drop the just-created timeline to avoid orphaning it.
+		if cerr := s.Pageserver.DeleteTimeline(ctx, p.TenantID, timelineID); cerr != nil {
+			slog.Error("cleanup orphaned timeline after persist failure", "timeline", timelineID, "err", cerr)
+		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -262,6 +326,38 @@ func (s *Server) createBranch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// waitAncestorIngested returns the ancestor's quorum-committed LSN once the
+// pageserver has ingested at least up to it, so a branch taken at that LSN
+// contains all committed WAL. Polls for up to 30s.
+func (s *Server) waitAncestorIngested(ctx context.Context, tenantID, timelineID string) (string, error) {
+	commit, err := s.Safekeeper.MaxCommitLSN(ctx, tenantID, timelineID)
+	if err != nil {
+		return "", fmt.Errorf("commit lsn: %w", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		detail, err := s.Pageserver.GetTimeline(ctx, tenantID, timelineID)
+		if err != nil {
+			return "", err
+		}
+		caught, err := lsn.AtLeast(detail.LastRecordLSN, commit)
+		if err != nil {
+			return "", err
+		}
+		if caught {
+			return commit, nil
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("pageserver did not reach lsn %s (at %s)", commit, detail.LastRecordLSN)
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+}
+
 func (s *Server) deleteBranch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	b, err := s.Store.GetBranchByID(ctx, r.PathValue("bid"))
@@ -271,6 +367,12 @@ func (s *Server) deleteBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// The branch must belong to the project named in the path; otherwise a
+	// request scoped to project A could delete project B's branch by id.
+	if b.ProjectID != r.PathValue("id") {
+		writeErr(w, http.StatusNotFound, "branch not found")
 		return
 	}
 	if b.IsDefault {

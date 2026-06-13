@@ -127,6 +127,9 @@ func (s *Suspender) fetchLastActive(ctx context.Context, addr string) (time.Time
 		return time.Time{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return time.Time{}, fmt.Errorf("compute_ctl /status: unexpected status %d", resp.StatusCode)
+	}
 	var body struct {
 		Status     string  `json:"status"`
 		LastActive *string `json:"last_active"`

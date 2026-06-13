@@ -65,6 +65,10 @@ spec:
           value: db.127-0-0-1.sslip.io
         - name: SUSPEND_CHECK_INTERVAL
           value: 30s
+        # Local-dev only: exposes /v1/debug/endpoints/* (used by integration
+        # tests). Must stay unset/false in any shared or production deployment.
+        - name: ENABLE_DEBUG_ENDPOINTS
+          value: "true"
         ports:
         - containerPort: 8080
 ---

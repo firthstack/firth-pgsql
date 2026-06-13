@@ -57,8 +57,16 @@ func (r *K8sRuntime) Start(ctx context.Context, endpointID string, cfg ComputeCo
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("create configmap: %w", err)
 		}
-		// Refresh spec for a retried start.
-		if _, err := r.client.CoreV1().ConfigMaps(r.namespace).Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+		// Refresh spec for a retried start. Carry the existing object's
+		// resourceVersion so the update is a clean compare-and-set rather
+		// than a blind overwrite.
+		existing, gerr := r.client.CoreV1().ConfigMaps(r.namespace).Get(ctx, cm.Name, metav1.GetOptions{})
+		if gerr != nil {
+			return fmt.Errorf("get configmap for update: %w", gerr)
+		}
+		existing.Data = cm.Data
+		existing.Labels = cm.Labels
+		if _, err := r.client.CoreV1().ConfigMaps(r.namespace).Update(ctx, existing, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update configmap: %w", err)
 		}
 	}

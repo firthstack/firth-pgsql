@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/insforge/fly-pgsql/internal/compute"
@@ -89,10 +90,14 @@ func (w *Waker) Wake(ctx context.Context, endpointID string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if st.Exists && addr != "" {
+			// Only trust the stored address if the pod is actually Running and
+			// still has the IP we recorded. A Pending/Failed pod, or one that
+			// was recreated with a new IP, must be reconciled — otherwise we'd
+			// hand the proxy a dead address.
+			if st.Exists && st.Phase == "Running" && addr != "" && strings.HasPrefix(addr, st.PodIP+":") {
 				return addr, nil
 			}
-			// State says running but the pod is gone: reconcile and retry.
+			// Pod is gone, not ready, or its address is stale: reconcile and retry.
 			if _, err := w.Store.TransitionEndpoint(ctx, endpointID, "running", "suspended"); err != nil {
 				return "", err
 			}

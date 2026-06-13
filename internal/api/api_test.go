@@ -93,6 +93,17 @@ func (s *stubWaker) Wake(ctx context.Context, endpointID string) (string, error)
 	return s.addr, nil
 }
 
+// stubSafekeeper returns a fixed commit LSN <= the fake pageserver's
+// last_record_lsn ("0/1"), so waitAncestorIngested returns immediately.
+type stubSafekeeper struct{ commit string }
+
+func (s stubSafekeeper) MaxCommitLSN(_ context.Context, _, _ string) (string, error) {
+	if s.commit == "" {
+		return "0/1", nil
+	}
+	return s.commit, nil
+}
+
 func testServer(t *testing.T) (*api.Server, *fakePageserver, *stubWaker, *state.Store) {
 	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -117,6 +128,7 @@ func testServer(t *testing.T) (*api.Server, *fakePageserver, *stubWaker, *state.
 	srv := &api.Server{
 		Store:      store,
 		Pageserver: neonclient.NewPageserver(ps.srv.URL),
+		Safekeeper: stubSafekeeper{},
 		Runtime:    compute.NewK8sRuntime(fake.NewClientset(), "fly-pgsql", "img"),
 		Waker:      waker,
 		Cfg: api.Config{
@@ -124,6 +136,7 @@ func testServer(t *testing.T) (*api.Server, *fakePageserver, *stubWaker, *state.
 			ProxyPort:            5432,
 			PageserverConnstring: "host=pageserver port=6400",
 			Safekeepers:          []string{"sk0:5454", "sk1:5454", "sk2:5454"},
+			EnableDebug:          true,
 		},
 	}
 	return srv, ps, waker, store
@@ -290,6 +303,61 @@ func TestDeleteBranch(t *testing.T) {
 	rec, _ = doJSON(t, h, http.MethodDelete, "/v1/projects/"+projectID+"/branches/"+proj["branch_id"].(string), nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("deleting default branch must 400, got %d", rec.Code)
+	}
+}
+
+// A branch may only be deleted through its own project's path. Using another
+// project's id must not delete it.
+func TestDeleteBranchWrongProjectIsScoped(t *testing.T) {
+	srv, _, _, store := testServer(t)
+	h := srv.Routes()
+	_, projA := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "a"})
+	_, projB := doJSON(t, h, http.MethodPost, "/v1/projects", map[string]string{"name": "b"})
+	_, brB := doJSON(t, h, http.MethodPost, "/v1/projects/"+projB["project_id"].(string)+"/branches",
+		map[string]string{"name": "victim"})
+
+	// Try to delete project B's branch via project A's path.
+	rec, _ := doJSON(t, h, http.MethodDelete,
+		"/v1/projects/"+projA["project_id"].(string)+"/branches/"+brB["branch_id"].(string), nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("cross-project delete must 404, got %d", rec.Code)
+	}
+	if _, err := store.GetBranchByID(context.Background(), brB["branch_id"].(string)); err != nil {
+		t.Error("victim branch was deleted via another project's path")
+	}
+}
+
+func TestAuthTokenGate(t *testing.T) {
+	srv, _, _, _ := testServer(t)
+	srv.Cfg.AuthToken = "s3cret"
+	h := srv.Routes()
+
+	// No header → 401.
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewReader([]byte(`{"name":"x"}`)))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("missing token must 401, got %d", rec.Code)
+	}
+
+	// Correct header → passes the gate (201).
+	req = httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewReader([]byte(`{"name":"x"}`)))
+	req.Header.Set("Authorization", "Bearer s3cret")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("valid token must pass, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDebugEndpointsDisabledByDefault(t *testing.T) {
+	srv, _, _, _ := testServer(t)
+	srv.Cfg.EnableDebug = false
+	h := srv.Routes()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/debug/endpoints/ep-x/start", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("debug routes must be absent when disabled, got %d", rec.Code)
 	}
 }
 

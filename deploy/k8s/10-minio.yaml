@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: minio
-        image: quay.io/minio/minio:latest
+        image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
         args: ["server", "/data", "--address", ":9000"]
         env:
         - name: MINIO_ROOT_USER
@@ -65,7 +65,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: mc
-        image: minio/mc:latest
+        image: minio/mc:RELEASE.2025-08-13T08-35-41Z
         command: ["/bin/sh", "-c"]
         args:
         - until mc alias set m http://minio:9000 minio password; do sleep 1; done;
