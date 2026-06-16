@@ -25,6 +25,24 @@ open-source storage stack. Multi-tenant, copy-on-write branching, scale-to-zero.
 
 概念映射：InsForge 项目 = Neon tenant；分支 = COW timeline；可连接实例 = endpoint（一个可起停的 compute pod）。compute 完全无状态——持久性在 safekeeper quorum + pageserver + S3。
 
+### 组件 / Pod 对照
+
+部署到 k8s 后（`kubectl -n fly-pgsql get pods`），各 pod 分三层：🟢 自研、🔵 Neon 官方镜像、⚙️ 支撑设施。
+
+| Pod | 层 | 模块 / 作用 |
+|---|---|---|
+| `controlplane` | 🟢 自研（`cmd/controlplane`, Go） | 核心编排层。北向 REST API（建项目/分支/用量）、proxy 的 `wake_compute` 契约、compute pod 生命周期（`K8sRuntime`）、空闲挂起调度器。无状态。 |
+| `statedb` | 🟢 自研配套 | 控制面自己的元数据库（普通 Postgres）。存 项目↔tenant、分支↔timeline、endpoint 状态机、role 凭据。与被托管的用户数据库无关。 |
+| `proxy` | 🔵 Neon 官方镜像 | 客户端入口（5432, TLS/SNI）。按 SNI 中的 endpoint 名路由，调控制面认证 + 唤醒 compute，再转发 Postgres 协议。 |
+| `pageserver-0` | 🔵 Neon 官方镜像 | 存储后端。提供页面服务（`GetPage@LSN`），把 WAL 物化成 layer 文件并卸载到 S3/MinIO。多租户。 |
+| `safekeeper-0/1/2` | 🔵 Neon 官方镜像 ×3 | WAL 三副本，Paxos quorum 持久化。事务提交时 WAL 先在此达成多数派——数据持久性的根基（compute 缩到零也不丢就靠它）。 |
+| `storage-broker` | 🔵 Neon 官方镜像 | pageserver ↔ safekeeper 间的元数据协调（WAL 位置发现）。无状态。 |
+| `minio` | ⚙️ 支撑设施 | S3 兼容对象存储，本地替代 AWS S3。pageserver/safekeeper 的冷数据落此。M4 上 AWS 时换成真 S3。 |
+| `minio-create-bucket` | ⚙️ 一次性 Job | 启动时创建 `neon` bucket，跑完即 `Completed`（正常，非常驻 pod）。 |
+| `compute-ep-xxxx` | 🔵 Neon 官方镜像（动态） | 每个被连接的 endpoint 一个（Postgres + neon 扩展 + compute_ctl）。由控制面按需创建/销毁，空闲缩到零，故 `get pods` 平时看不到。 |
+
+> 缩容时 `compute-ep-*` pod 短暂出现 `Error` 终态属正常：挂起先 `POST /terminate` 把 WAL 刷到 safekeeper（数据落定），再立刻删除 pod，容器被删除信号打断而以非 0 退出。数据不丢，pod 不累积。
+
 **实测性能**（OrbStack k8s, Apple Silicon）：冷启动（连接触发唤醒到可查询）≈1.3s；热连接 11ms；COW 分支创建 22ms；挂起后重唤醒 ≈3s。
 
 ## 快速开始（本地 OrbStack k8s）
