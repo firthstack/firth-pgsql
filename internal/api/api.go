@@ -1,4 +1,4 @@
-// Package api serves the InsForge-facing (northbound) REST API plus debug
+// Package api serves the FirthStack-facing (northbound) REST API plus debug
 // endpoints. The Neon-proxy-facing contract lives in internal/proxycontract.
 package api
 
@@ -39,7 +39,7 @@ type Config struct {
 	Safekeepers          []string
 	// AuthToken, when non-empty, requires "Authorization: Bearer <token>" on
 	// every /v1/* request. Empty disables the check (local dev). This is a
-	// coarse service-to-service guard; per-tenant InsForge JWT auth is future
+	// coarse service-to-service guard; per-tenant FirthStack JWT auth is future
 	// work (jwks integration, M4).
 	AuthToken string
 	// EnableDebug exposes the destructive /v1/debug/endpoints/* routes. Off by
@@ -124,7 +124,7 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 	projectID := ids.NewProjectID()
 	branchID := ids.NewBranchID()
 	endpointID := ids.NewEndpointID()
-	const roleName = "insforge"
+	const roleName = "firth"
 	const dbName = "appdb"
 
 	password, err := scram.RandomPassword()

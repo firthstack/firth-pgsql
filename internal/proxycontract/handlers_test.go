@@ -45,7 +45,7 @@ func setup(t *testing.T, w proxycontract.Waker) http.Handler {
 	}
 	store := state.New(pool)
 	if err := store.CreateProject(ctx,
-		state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "insforge", RoleVerifier: verifier},
+		state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "firth", RoleVerifier: verifier},
 		state.Branch{ID: "br-1", ProjectID: "prj1", Name: "main", TimelineID: strings.Repeat("b", 32), IsDefault: true},
 		state.Endpoint{ID: "ep-abc", BranchID: "br-1", State: "suspended"},
 	); err != nil {
@@ -68,7 +68,7 @@ func get(t *testing.T, h http.Handler, path string) (int, map[string]any) {
 
 func TestGetEndpointAccessControl(t *testing.T) {
 	h := setup(t, &stubWaker{addr: "10.0.0.7:55433"})
-	code, m := get(t, h, "/proxy/api/get_endpoint_access_control?session_id=u&application_name=psql&endpointish=ep-abc&role=insforge")
+	code, m := get(t, h, "/proxy/api/get_endpoint_access_control?session_id=u&application_name=psql&endpointish=ep-abc&role=firth")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %v", code, m)
 	}
@@ -85,7 +85,7 @@ func TestGetEndpointAccessControl(t *testing.T) {
 
 func TestAccessControlUnknownEndpoint(t *testing.T) {
 	h := setup(t, &stubWaker{})
-	code, m := get(t, h, "/proxy/api/get_endpoint_access_control?endpointish=ep-nope&role=insforge")
+	code, m := get(t, h, "/proxy/api/get_endpoint_access_control?endpointish=ep-nope&role=firth")
 	if code != http.StatusNotFound {
 		t.Fatalf("status %d", code)
 	}
@@ -155,7 +155,7 @@ func TestWakeComputeUnknownEndpoint(t *testing.T) {
 
 func TestLegacyAliases(t *testing.T) {
 	h := setup(t, &stubWaker{addr: "10.0.0.7:55433"})
-	code, m := get(t, h, "/proxy/api/proxy_get_role_secret?endpointish=ep-abc&role=insforge")
+	code, m := get(t, h, "/proxy/api/proxy_get_role_secret?endpointish=ep-abc&role=firth")
 	if code != http.StatusOK || m["role_secret"] != verifier {
 		t.Errorf("proxy_get_role_secret alias: %d %v", code, m)
 	}

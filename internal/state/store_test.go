@@ -33,7 +33,7 @@ func testPool(t *testing.T) *pgxpool.Pool {
 
 func seedProject(t *testing.T, s *state.Store) (state.Project, state.Branch, state.Endpoint) {
 	t.Helper()
-	p := state.Project{ID: "prj0001", Name: "demo", TenantID: "aaaabbbbccccddddaaaabbbbccccdddd", PgVersion: 17, RoleName: "insforge", RoleVerifier: "SCRAM-SHA-256$4096:c2FsdA==$x:y"}
+	p := state.Project{ID: "prj0001", Name: "demo", TenantID: "aaaabbbbccccddddaaaabbbbccccdddd", PgVersion: 17, RoleName: "firth", RoleVerifier: "SCRAM-SHA-256$4096:c2FsdA==$x:y"}
 	b := state.Branch{ID: "br-0001", ProjectID: p.ID, Name: "main", TimelineID: "1111222233334444aaaabbbbccccdddd", IsDefault: true}
 	ep := state.Endpoint{ID: "ep-0001", BranchID: b.ID, State: "suspended", SuspendAfterSeconds: 300}
 	if err := s.CreateProject(context.Background(), p, b, ep); err != nil {

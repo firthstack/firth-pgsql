@@ -102,7 +102,7 @@ func setup(t *testing.T) (*suspend.Suspender, *fakeRuntime, *fakeComputeCtl, *st
 	}
 	store := state.New(pool)
 	if err := store.CreateProject(ctx,
-		state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "insforge", RoleVerifier: "v"},
+		state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "firth", RoleVerifier: "v"},
 		state.Branch{ID: "br-1", ProjectID: "prj1", Name: "main", TimelineID: strings.Repeat("b", 32), IsDefault: true},
 		state.Endpoint{ID: "ep-1", BranchID: "br-1", State: "suspended", SuspendAfterSeconds: 300},
 	); err != nil {

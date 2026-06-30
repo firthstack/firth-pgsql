@@ -11,7 +11,7 @@ func testParams() compute.SpecParams {
 	return compute.SpecParams{
 		TenantID:             "aaaabbbbccccddddaaaabbbbccccdddd",
 		TimelineID:           "1111222233334444aaaabbbbccccdddd",
-		RoleName:             "insforge",
+		RoleName:             "firth",
 		RoleVerifier:         "SCRAM-SHA-256$4096:c2FsdHNhbHRzYWx0c2FsdA==$AAAA:BBBB",
 		DatabaseName:         "appdb",
 		PageserverConnstring: "host=pageserver port=6400",
@@ -73,7 +73,7 @@ func TestBuildComputeConfig(t *testing.T) {
 		t.Errorf("cloud_admin role: %v", admin)
 	}
 	app := roles[1].(map[string]any)
-	if app["name"] != "insforge" || app["encrypted_password"] != "SCRAM-SHA-256$4096:c2FsdHNhbHRzYWx0c2FsdA==$AAAA:BBBB" {
+	if app["name"] != "firth" || app["encrypted_password"] != "SCRAM-SHA-256$4096:c2FsdHNhbHRzYWx0c2FsdA==$AAAA:BBBB" {
 		t.Errorf("app role: %v", app)
 	}
 
@@ -82,7 +82,7 @@ func TestBuildComputeConfig(t *testing.T) {
 		t.Fatalf("expected 1 database, got %d", len(dbs))
 	}
 	db := dbs[0].(map[string]any)
-	if db["name"] != "appdb" || db["owner"] != "insforge" {
+	if db["name"] != "appdb" || db["owner"] != "firth" {
 		t.Errorf("database: %v", db)
 	}
 

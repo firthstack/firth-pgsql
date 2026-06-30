@@ -1,11 +1,11 @@
 # firth-pgsql
 
-On-the-fly serverless Postgres for InsForge, built on [Neon](https://github.com/neondatabase/neon)'s
+On-the-fly serverless Postgres for FirthStack, built on [Neon](https://github.com/neondatabase/neon)'s
 open-source storage stack. Multi-tenant, copy-on-write branching, scale-to-zero.
 
 ```
                          ┌──────────────────────────────────┐
-  InsForge ──────────────►  控制面 (Go, cmd/controlplane)     │
+  FirthStack ──────────────►  控制面 (Go, cmd/controlplane)     │
   (建项目/建分支/用量)      │  · 北向 REST API                  │
                          │  · proxy 契约: wake_compute 等    │
                          │  · compute pod 生命周期 + 空闲挂起  │
@@ -23,7 +23,7 @@ open-source storage stack. Multi-tenant, copy-on-write branching, scale-to-zero.
                                           └────────────────┘
 ```
 
-概念映射：InsForge 项目 = Neon tenant；分支 = COW timeline；可连接实例 = endpoint（一个可起停的 compute pod）。compute 完全无状态——持久性在 safekeeper quorum + pageserver + S3。
+概念映射：FirthStack 项目 = Neon tenant；分支 = COW timeline；可连接实例 = endpoint（一个可起停的 compute pod）。compute 完全无状态——持久性在 safekeeper quorum + pageserver + S3。
 
 ### 组件 / Pod 对照
 
@@ -66,7 +66,7 @@ curl -s -X POST localhost:18080/v1/projects -d '{"name":"demo"}' | jq
 
 # 用返回的 connection_uri 直接连（域名经 sslip.io 解析到 127.0.0.1；
 # 连接会自动唤醒 compute。验证证书加 sslrootcert）：
-psql "postgresql://insforge:<password>@ep-xxxx.db.127-0-0-1.sslip.io:5432/appdb?sslmode=verify-full&sslrootcert=deploy/certs/ca.crt"
+psql "postgresql://firth:<password>@ep-xxxx.db.127-0-0-1.sslip.io:5432/appdb?sslmode=verify-full&sslrootcert=deploy/certs/ca.crt"
 
 # 建分支（COW，毫秒级；凭项目密码连分支的 host）
 curl -s -X POST localhost:18080/v1/projects/<prj>/branches -d '{"name":"preview"}' | jq

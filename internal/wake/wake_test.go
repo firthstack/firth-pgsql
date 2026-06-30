@@ -90,7 +90,7 @@ func setup(t *testing.T) (*wake.Waker, *fakeRuntime, *state.Store, string) {
 		t.Fatal(err)
 	}
 	store := state.New(pool)
-	p := state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "insforge", RoleVerifier: "SCRAM-SHA-256$4096:s$a:b"}
+	p := state.Project{ID: "prj1", Name: "demo", TenantID: strings.Repeat("a", 32), PgVersion: 17, RoleName: "firth", RoleVerifier: "SCRAM-SHA-256$4096:s$a:b"}
 	b := state.Branch{ID: "br-1", ProjectID: "prj1", Name: "main", TimelineID: strings.Repeat("b", 32), IsDefault: true}
 	ep := state.Endpoint{ID: "ep-1", BranchID: "br-1", State: "suspended"}
 	if err := store.CreateProject(ctx, p, b, ep); err != nil {

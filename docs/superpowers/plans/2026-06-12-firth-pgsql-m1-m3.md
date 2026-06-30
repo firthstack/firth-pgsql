@@ -675,9 +675,9 @@ func (s *Server) Routes() *http.ServeMux
 `POST /v1/projects` 流程：生成 ids 与密码 → `scram.BuildVerifier` → pageserver `AttachTenant` + `CreateTimeline`（失败则直接返回，无需回滚 pageserver——tenant 残留无害，记日志）→ `store.CreateProject` → 201 返回：
 ```json
 {"project_id":"prj…","branch_id":"br-…","endpoint_id":"ep-…",
- "role":"insforge","password":"<明文，仅此一次>",
+ "role":"firth","password":"<明文，仅此一次>",
  "host":"ep-….db.127-0-0-1.sslip.io","port":5432,"database":"appdb",
- "connection_uri":"postgresql://insforge:<pw>@ep-….db.127-0-0-1.sslip.io:5432/appdb?sslmode=require"}
+ "connection_uri":"postgresql://firth:<pw>@ep-….db.127-0-0-1.sslip.io:5432/appdb?sslmode=require"}
 ```
 调试端点（M1 验收用，M2 复用其内部函数）：`POST /v1/debug/endpoints/{id}/start` → 同步拉起 compute 并等就绪，返回 pod IP；`POST /v1/debug/endpoints/{id}/stop`。start 的就绪等待：每 500ms GET `http://<podIP>:3080/status` 直到 `{"status":"running"}`，超时 120s。
 
@@ -719,7 +719,7 @@ git add -A && git commit -m "feat: northbound api + controlplane deployment"
 前置（README 化）：`make deploy-storage deploy-cp` 完成、控制面与 statedb 的 port-forward 在测试 TestMain 里自动建（exec kubectl）或要求手工开。流程：
 1. `POST /v1/projects` → 拿到 endpoint_id、password。
 2. `POST /v1/debug/endpoints/{ep}/start` → 拿 pod IP。
-3. `kubectl -n firth-pgsql port-forward pod/compute-<ep> 55433:55433`（测试内 exec），pgx 连 `postgresql://insforge:<pw>@localhost:55433/appdb` → `CREATE TABLE t(x int); INSERT 1,2,3; SELECT count(*)`==3。
+3. `kubectl -n firth-pgsql port-forward pod/compute-<ep> 55433:55433`（测试内 exec），pgx 连 `postgresql://firth:<pw>@localhost:55433/appdb` → `CREATE TABLE t(x int); INSERT 1,2,3; SELECT count(*)`==3。
 4. 断言 MinIO 有数据：exec `kubectl -n firth-pgsql exec deploy/minio -- ls /data/neon/pageserver/` 非空（或 mc ls）。
 5. `POST /v1/debug/endpoints/{ep}/stop` → pod 消失；再 start → 数据仍在（count==3）。**这一步证明存算分离成立，是 M1 的核心验收。**
 
@@ -813,7 +813,7 @@ git add scripts deploy && git commit -m "feat: tls certs + neon proxy deployment
 
 - [ ] **Step 1: 写失败测试**（httptest 直测 handler；wake 依赖注入接口 `Waker`，测试用假实现）
 
-- `TestGetEndpointAccessControl`：`GET /proxy/api/get_endpoint_access_control?session_id=u&application_name=psql&endpointish=ep-abc&role=insforge` → 200 `{"role_secret":"SCRAM-SHA-256$…","project_id":"prj…","allowed_ips":null}`。
+- `TestGetEndpointAccessControl`：`GET /proxy/api/get_endpoint_access_control?session_id=u&application_name=psql&endpointish=ep-abc&role=firth` → 200 `{"role_secret":"SCRAM-SHA-256$…","project_id":"prj…","allowed_ips":null}`。
 - `TestAccessControlUnknownEndpoint` → 404，body 为研究报告中的错误结构：`{"error":"endpoint not found","status":{"code":"NOT_FOUND","message":"endpoint not found","details":{"error_info":{"reason":"ENDPOINT_NOT_FOUND"}}}}`。
 - `TestAccessControlUnknownRole` → 200 且 `role_secret:""`（proxy 端语义＝无此角色，认证必败，不泄露角色存在性）。
 - `TestWakeCompute`：假 Waker 返回 `10.0.0.7:55433` → 200 `{"address":"10.0.0.7:55433","aux":{"endpoint_id":"ep-abc","project_id":"prj…","branch_id":"br-…","compute_id":"compute-ep-abc","cold_start_info":"unknown"}}`。
