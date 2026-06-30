@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/insforge/fly-pgsql/internal/proxycontract"
-	"github.com/insforge/fly-pgsql/internal/state"
+	"github.com/insforge/firth-pgsql/internal/proxycontract"
+	"github.com/insforge/firth-pgsql/internal/state"
 )
 
 type stubWaker struct {

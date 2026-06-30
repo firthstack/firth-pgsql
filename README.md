@@ -1,4 +1,4 @@
-# fly-pgsql
+# firth-pgsql
 
 On-the-fly serverless Postgres for InsForge, built on [Neon](https://github.com/neondatabase/neon)'s
 open-source storage stack. Multi-tenant, copy-on-write branching, scale-to-zero.
@@ -27,7 +27,7 @@ open-source storage stack. Multi-tenant, copy-on-write branching, scale-to-zero.
 
 ### 组件 / Pod 对照
 
-部署到 k8s 后（`kubectl -n fly-pgsql get pods`），各 pod 分三层：🟢 自研、🔵 Neon 官方镜像、⚙️ 支撑设施。
+部署到 k8s 后（`kubectl -n firth-pgsql get pods`），各 pod 分三层：🟢 自研、🔵 Neon 官方镜像、⚙️ 支撑设施。
 
 | Pod | 层 | 模块 / 作用 |
 |---|---|---|
@@ -58,7 +58,7 @@ make deploy-cp          # 构建并部署 Go 控制面
 kubectl apply -f deploy/k8s/70-proxy.yaml   # Neon proxy
 
 # 等全部 Running 后：
-kubectl -n fly-pgsql port-forward svc/controlplane 18080:8080 &
+kubectl -n firth-pgsql port-forward svc/controlplane 18080:8080 &
 make forward &          # proxy → localhost:5432
 
 # 建项目（返回连接串，密码仅此一次）
@@ -90,7 +90,7 @@ curl -s -X POST localhost:18080/v1/projects/<prj>/branches -d '{"name":"preview"
 
 ```bash
 # 单元测试（需要一个测试 postgres）
-docker run -d --name flypgsql-test -e POSTGRES_PASSWORD=t -p 5433:5432 postgres:17
+docker run -d --name firthpgsql-test -e POSTGRES_PASSWORD=t -p 5433:5432 postgres:17
 TEST_DATABASE_URL=postgres://postgres:t@localhost:5433/postgres make test
 
 # 端到端（需要上面整套集群在跑）
@@ -106,5 +106,5 @@ make integration
 
 ## 文档
 
-- 设计 spec：`docs/superpowers/specs/2026-06-12-fly-pgsql-design.md`
-- 实施计划：`docs/superpowers/plans/2026-06-12-fly-pgsql-m1-m3.md`
+- 设计 spec：`docs/superpowers/specs/2026-06-12-firth-pgsql-design.md`
+- 实施计划：`docs/superpowers/plans/2026-06-12-firth-pgsql-m1-m3.md`

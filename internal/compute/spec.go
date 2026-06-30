@@ -92,8 +92,8 @@ func BuildComputeConfig(p SpecParams) ComputeConfig {
 			Mode:                  "Primary",
 			DeltaOperations:       []any{},
 			Cluster: Cluster{
-				ClusterID: "fly-pgsql",
-				Name:      "fly-pgsql",
+				ClusterID: "firth-pgsql",
+				Name:      "firth-pgsql",
 				State:     "restarted",
 				Roles: []Role{
 					{Name: "cloud_admin", EncryptedPassword: &admin},

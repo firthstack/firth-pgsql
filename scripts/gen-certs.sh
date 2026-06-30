@@ -13,7 +13,7 @@ DOMAIN="${DOMAIN:-db.127-0-0-1.sslip.io}"
 
 if [[ ! -f ca.key ]]; then
   openssl genrsa -out ca.key 2048
-  openssl req -new -x509 -days 3650 -key ca.key -subj "/CN=fly-pgsql-dev-ca" -out ca.crt
+  openssl req -new -x509 -days 3650 -key ca.key -subj "/CN=firth-pgsql-dev-ca" -out ca.crt
 fi
 
 openssl genrsa -out proxy.key 2048
@@ -22,7 +22,7 @@ printf "subjectAltName=DNS:*.%s,DNS:%s\n" "$DOMAIN" "$DOMAIN" > ext.cnf
 openssl x509 -req -days 3650 -in proxy.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
   -extfile ext.cnf -out proxy.crt
 
-kubectl -n fly-pgsql create secret tls proxy-tls \
+kubectl -n firth-pgsql create secret tls proxy-tls \
   --cert=proxy.crt --key=proxy.key \
   --dry-run=client -o yaml | kubectl apply -f -
 

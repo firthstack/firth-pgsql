@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/insforge/fly-pgsql/internal/compute"
-	"github.com/insforge/fly-pgsql/internal/state"
+	"github.com/insforge/firth-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/state"
 )
 
 type Suspender struct {

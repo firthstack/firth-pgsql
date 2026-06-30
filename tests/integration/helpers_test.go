@@ -1,6 +1,6 @@
 //go:build integration
 
-// Package integration holds end-to-end tests against a running fly-pgsql
+// Package integration holds end-to-end tests against a running firth-pgsql
 // deployment on the local k8s cluster (OrbStack). Prerequisites:
 //
 //	make deploy-storage deploy-cp   # all pods Running
@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-const namespace = "fly-pgsql"
+const namespace = "firth-pgsql"
 
 // portForward starts kubectl port-forward and waits until the local port
 // accepts connections. Returns a cleanup func.

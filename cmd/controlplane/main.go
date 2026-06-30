@@ -14,13 +14,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/insforge/fly-pgsql/internal/api"
-	"github.com/insforge/fly-pgsql/internal/compute"
-	"github.com/insforge/fly-pgsql/internal/neonclient"
-	"github.com/insforge/fly-pgsql/internal/proxycontract"
-	"github.com/insforge/fly-pgsql/internal/state"
-	"github.com/insforge/fly-pgsql/internal/suspend"
-	"github.com/insforge/fly-pgsql/internal/wake"
+	"github.com/insforge/firth-pgsql/internal/api"
+	"github.com/insforge/firth-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/neonclient"
+	"github.com/insforge/firth-pgsql/internal/proxycontract"
+	"github.com/insforge/firth-pgsql/internal/state"
+	"github.com/insforge/firth-pgsql/internal/suspend"
+	"github.com/insforge/firth-pgsql/internal/wake"
 )
 
 func env(key, def string) string {
@@ -47,8 +47,8 @@ func main() {
 	ctx := context.Background()
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 
-	dbURL := env("DATABASE_URL", "postgres://flypgsql:flypgsql@statedb:5432/flypgsql")
-	namespace := env("NAMESPACE", "fly-pgsql")
+	dbURL := env("DATABASE_URL", "postgres://firthpgsql:firthpgsql@statedb:5432/firthpgsql")
+	namespace := env("NAMESPACE", "firth-pgsql")
 	pageserverURL := env("PAGESERVER_URL", "http://pageserver:9898")
 	pageserverConnstring := env("PAGESERVER_CONNSTRING", "host=pageserver port=6400")
 	safekeepers := strings.Split(env("SAFEKEEPERS",

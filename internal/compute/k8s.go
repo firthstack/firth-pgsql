@@ -99,7 +99,7 @@ func (r *K8sRuntime) buildPod(endpointID string) *corev1.Pod {
 				// INSTANCE_ID enables compute_ctl's trusted-network mode: the
 				// external HTTP API (/status, /terminate) skips JWT auth. The
 				// pod network is only reachable by the control plane and proxy.
-				Env: []corev1.EnvVar{{Name: "INSTANCE_ID", Value: "fly-pgsql-" + endpointID}},
+				Env: []corev1.EnvVar{{Name: "INSTANCE_ID", Value: "firth-pgsql-" + endpointID}},
 				Command: []string{
 					"/usr/local/bin/compute_ctl",
 					"--pgdata", "/var/db/postgres/compute",

@@ -10,12 +10,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/insforge/fly-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/compute"
 )
 
 func newRuntime() (*compute.K8sRuntime, *fake.Clientset) {
 	client := fake.NewClientset()
-	rt := compute.NewK8sRuntime(client, "fly-pgsql", "ghcr.io/neondatabase/compute-node-v17:release-compute-9073")
+	rt := compute.NewK8sRuntime(client, "firth-pgsql", "ghcr.io/neondatabase/compute-node-v17:release-compute-9073")
 	return rt, client
 }
 
@@ -28,7 +28,7 @@ func TestStartCreatesConfigMapAndPod(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	cm, err := client.CoreV1().ConfigMaps("fly-pgsql").Get(ctx, "compute-ep-abc-config", metav1.GetOptions{})
+	cm, err := client.CoreV1().ConfigMaps("firth-pgsql").Get(ctx, "compute-ep-abc-config", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("configmap: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestStartCreatesConfigMapAndPod(t *testing.T) {
 		t.Errorf("config roundtrip mismatch")
 	}
 
-	pod, err := client.CoreV1().Pods("fly-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{})
+	pod, err := client.CoreV1().Pods("firth-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("pod: %v", err)
 	}
@@ -100,10 +100,10 @@ func TestStopDeletesBoth(t *testing.T) {
 	if err := rt.Stop(ctx, "ep-abc"); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
-	if _, err := client.CoreV1().Pods("fly-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{}); err == nil {
+	if _, err := client.CoreV1().Pods("firth-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{}); err == nil {
 		t.Error("pod still exists")
 	}
-	if _, err := client.CoreV1().ConfigMaps("fly-pgsql").Get(ctx, "compute-ep-abc-config", metav1.GetOptions{}); err == nil {
+	if _, err := client.CoreV1().ConfigMaps("firth-pgsql").Get(ctx, "compute-ep-abc-config", metav1.GetOptions{}); err == nil {
 		t.Error("configmap still exists")
 	}
 	// Stop on a non-existent endpoint must not error
@@ -126,9 +126,9 @@ func TestStatusReportsPodIP(t *testing.T) {
 
 	cfg := compute.BuildComputeConfig(testParams())
 	_ = rt.Start(ctx, "ep-abc", cfg)
-	pod, _ := client.CoreV1().Pods("fly-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{})
+	pod, _ := client.CoreV1().Pods("firth-pgsql").Get(ctx, "compute-ep-abc", metav1.GetOptions{})
 	pod.Status = corev1.PodStatus{PodIP: "10.0.0.5", Phase: corev1.PodRunning}
-	_, _ = client.CoreV1().Pods("fly-pgsql").UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+	_, _ = client.CoreV1().Pods("firth-pgsql").UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 
 	st, err = rt.Status(ctx, "ep-abc")
 	if err != nil {

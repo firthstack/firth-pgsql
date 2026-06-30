@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: statedb-data
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   accessModes: [ReadWriteOnce]
   resources:
@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: statedb
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   replicas: 1
   selector:
@@ -29,11 +29,11 @@ spec:
         image: postgres:17
         env:
         - name: POSTGRES_USER
-          value: flypgsql
+          value: firthpgsql
         - name: POSTGRES_PASSWORD
-          value: flypgsql
+          value: firthpgsql
         - name: POSTGRES_DB
-          value: flypgsql
+          value: firthpgsql
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         ports:
@@ -50,7 +50,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: statedb
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   selector:
     app: statedb

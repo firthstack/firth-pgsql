@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: storage-broker
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   replicas: 1
   selector:
@@ -24,7 +24,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: storage-broker
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   selector:
     app: storage-broker

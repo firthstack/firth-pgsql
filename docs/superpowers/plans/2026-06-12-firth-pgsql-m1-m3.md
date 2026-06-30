@@ -1,8 +1,8 @@
-# fly-pgsql M1+M2+M3 实施计划
+# firth-pgsql M1+M2+M3 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在本地 OrbStack k8s 上完整跑通基于 Neon 开源栈的 serverless Postgres：多租户、branching、scale-to-zero（spec: `docs/superpowers/specs/2026-06-12-fly-pgsql-design.md`）。
+**Goal:** 在本地 OrbStack k8s 上完整跑通基于 Neon 开源栈的 serverless Postgres：多租户、branching、scale-to-zero（spec: `docs/superpowers/specs/2026-06-12-firth-pgsql-design.md`）。
 
 **Architecture:** Neon 官方镜像（钉死 `release-9129`）跑存储栈（pageserver + 3×safekeeper + storage_broker + proxy）+ MinIO 替代 S3；自研 Go 控制面实现 proxy 的 wake_compute 契约、compute pod 生命周期（client-go）、空闲挂起调度。
 
@@ -14,10 +14,10 @@
 
 | 项 | 值 |
 |---|---|
-| k8s namespace | `fly-pgsql` |
+| k8s namespace | `firth-pgsql` |
 | 存储镜像 | `ghcr.io/neondatabase/neon:release-9129`（pageserver/safekeeper/broker/proxy 同一镜像） |
 | compute 镜像 | `ghcr.io/neondatabase/compute-node-v17:release-compute-9073`（compute 走独立 release 轨道，无 release-9129 tag；执行期已验证含 arm64） |
-| Go module | `github.com/insforge/fly-pgsql` |
+| Go module | `github.com/insforge/firth-pgsql` |
 | 端口 | pageserver 6400(pg)/9898(http)；safekeeper 5454(pg)/7676(http)；broker 50051；compute 55433(pg)/3080(http)；proxy 4432(pg)/7001(http)；控制面 8080；MinIO 9000；statedb 5432 |
 | 域名 | endpoint 域名 `<ep-id>.db.127-0-0-1.sslip.io`（公共 DNS 解析到 127.0.0.1，零配置） |
 | ID 格式 | tenant/timeline = 32 hex；project = `prj` + 12 hex；branch = `br-` + 12 hex；endpoint = `ep-` + 12 hex（proxy 只允许字母数字和 `-`） |
@@ -73,8 +73,8 @@ docker pull ghcr.io/neondatabase/compute-node-v17:release-9129
 - [ ] **Step 1: 初始化 module 与依赖**
 
 ```bash
-cd /Users/junwen/Work/InsFg/fly-pgsql
-go mod init github.com/insforge/fly-pgsql
+cd /Users/junwen/Work/InsFg/firth-pgsql
+go mod init github.com/insforge/firth-pgsql
 go get github.com/jackc/pgx/v5@latest golang.org/x/crypto@latest \
       k8s.io/client-go@latest k8s.io/api@latest k8s.io/apimachinery@latest
 ```
@@ -92,7 +92,7 @@ deploy/certs/
 
 `Makefile`:
 ```makefile
-NS := fly-pgsql
+NS := firth-pgsql
 
 .PHONY: test build image deploy-storage deploy-cp certs forward integration
 
@@ -103,7 +103,7 @@ build:
 	CGO_ENABLED=0 go build -o bin/controlplane ./cmd/controlplane
 
 image:
-	docker build -t fly-pgsql/controlplane:dev .
+	docker build -t firth-pgsql/controlplane:dev .
 
 deploy-storage:
 	kubectl apply -f deploy/k8s/00-namespace.yaml -f deploy/k8s/10-minio.yaml \
@@ -146,19 +146,19 @@ git add -A && git commit -m "chore: scaffold go module and makefile"
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: fly-pgsql
+  name: firth-pgsql
 ```
 
 `10-minio.yaml`（Deployment + PVC + Service + bucket 初始化 Job）:
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
-metadata: { name: minio-data, namespace: fly-pgsql }
+metadata: { name: minio-data, namespace: firth-pgsql }
 spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 20Gi } } }
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: { name: minio, namespace: fly-pgsql }
+metadata: { name: minio, namespace: firth-pgsql }
 spec:
   replicas: 1
   selector: { matchLabels: { app: minio } }
@@ -178,12 +178,12 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: minio, namespace: fly-pgsql }
+metadata: { name: minio, namespace: firth-pgsql }
 spec: { selector: { app: minio }, ports: [{ port: 9000 }] }
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: { name: minio-create-bucket, namespace: fly-pgsql }
+metadata: { name: minio-create-bucket, namespace: firth-pgsql }
 spec:
   template:
     spec:
@@ -203,7 +203,7 @@ spec:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
-metadata: { name: storage-broker, namespace: fly-pgsql }
+metadata: { name: storage-broker, namespace: firth-pgsql }
 spec:
   replicas: 1
   selector: { matchLabels: { app: storage-broker } }
@@ -218,7 +218,7 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: storage-broker, namespace: fly-pgsql }
+metadata: { name: storage-broker, namespace: firth-pgsql }
 spec: { selector: { app: storage-broker }, ports: [{ port: 50051 }] }
 ```
 
@@ -226,7 +226,7 @@ spec: { selector: { app: storage-broker }, ports: [{ port: 50051 }] }
 ```yaml
 apiVersion: v1
 kind: Service
-metadata: { name: safekeeper, namespace: fly-pgsql }
+metadata: { name: safekeeper, namespace: firth-pgsql }
 spec:
   clusterIP: None
   selector: { app: safekeeper }
@@ -234,7 +234,7 @@ spec:
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: { name: safekeeper, namespace: fly-pgsql }
+metadata: { name: safekeeper, namespace: firth-pgsql }
 spec:
   serviceName: safekeeper
   replicas: 3
@@ -254,7 +254,7 @@ spec:
           ORD=${HOSTNAME##*-};
           exec safekeeper
           --id=$((ORD+1))
-          --listen-pg=${HOSTNAME}.safekeeper.fly-pgsql.svc.cluster.local:5454
+          --listen-pg=${HOSTNAME}.safekeeper.firth-pgsql.svc.cluster.local:5454
           --listen-http=0.0.0.0:7676
           --broker-endpoint=http://storage-broker:50051
           -D /data
@@ -272,7 +272,7 @@ spec:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metadata: { name: pageserver-config, namespace: fly-pgsql }
+metadata: { name: pageserver-config, namespace: firth-pgsql }
 data:
   pageserver.toml: |
     broker_endpoint='http://storage-broker:50051'
@@ -287,7 +287,7 @@ data:
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: { name: pageserver, namespace: fly-pgsql }
+metadata: { name: pageserver, namespace: firth-pgsql }
 spec:
   serviceName: pageserver
   replicas: 1
@@ -318,21 +318,21 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: pageserver, namespace: fly-pgsql }
+metadata: { name: pageserver, namespace: firth-pgsql }
 spec: { selector: { app: pageserver }, ports: [{ name: pg, port: 6400 }, { name: http, port: 9898 }] }
 ```
 注意：镜像以 `USER neon` 运行，若 initContainer 复制的文件权限导致 pageserver 读不到，给 initContainer 加 `chmod -R a+r`；若 PVC 属主问题导致写失败，在 pod spec 加 `securityContext: { fsGroup: 1000 }`（执行时按实际报错调整，这是 k8s 上跑该镜像最常见的坑）。
 
 - [ ] **Step 4: 状态库**
 
-`50-statedb.yaml`：postgres:17 Deployment + 5Gi PVC + Service `statedb`，`POSTGRES_USER=flypgsql / POSTGRES_PASSWORD=flypgsql / POSTGRES_DB=flypgsql`（结构同 MinIO 的 Deployment 模式，端口 5432）。
+`50-statedb.yaml`：postgres:17 Deployment + 5Gi PVC + Service `statedb`，`POSTGRES_USER=firthpgsql / POSTGRES_PASSWORD=firthpgsql / POSTGRES_DB=firthpgsql`（结构同 MinIO 的 Deployment 模式，端口 5432）。
 
 - [ ] **Step 5: 部署并验证**
 
 ```bash
 make deploy-storage
-kubectl -n fly-pgsql get pods   # 期望 minio/broker/safekeeper-{0,1,2}/pageserver-0/statedb 全部 Running，Job Completed
-kubectl -n fly-pgsql port-forward svc/pageserver 9898:9898 &
+kubectl -n firth-pgsql get pods   # 期望 minio/broker/safekeeper-{0,1,2}/pageserver-0/statedb 全部 Running，Job Completed
+kubectl -n firth-pgsql port-forward svc/pageserver 9898:9898 &
 curl -s http://localhost:9898/v1/status        # 期望 {"id":1234}
 curl -s http://localhost:9898/v1/tenant        # 期望 []
 kill %1
@@ -349,7 +349,7 @@ git add deploy/ && git commit -m "feat: k8s manifests for neon storage stack + m
 **Files:**
 - Create: `internal/state/schema.sql`, `internal/state/store.go`, `internal/state/store_test.go`
 
-测试依赖真实 postgres：测试用 `TEST_DATABASE_URL` 环境变量（本地 `docker run -d --name flypgsql-test -e POSTGRES_PASSWORD=t -p 5433:5432 postgres:17` 或 port-forward statedb），未设置时 `t.Skip`。
+测试依赖真实 postgres：测试用 `TEST_DATABASE_URL` 环境变量（本地 `docker run -d --name firthpgsql-test -e POSTGRES_PASSWORD=t -p 5433:5432 postgres:17` 或 port-forward statedb），未设置时 `t.Skip`。
 
 - [ ] **Step 1: 写 schema.sql**
 
@@ -698,13 +698,13 @@ COPY --from=build /controlplane /controlplane
 ENTRYPOINT ["/controlplane"]
 ```
 
-`60-controlplane.yaml`：ServiceAccount `controlplane` + Role（pods/configmaps 的 get/list/create/delete/watch）+ RoleBinding + Deployment（image `fly-pgsql/controlplane:dev`，`imagePullPolicy: IfNotPresent`，env 上述全套，`DATABASE_URL=postgres://flypgsql:flypgsql@statedb:5432/flypgsql`）+ Service `controlplane:8080`。
+`60-controlplane.yaml`：ServiceAccount `controlplane` + Role（pods/configmaps 的 get/list/create/delete/watch）+ RoleBinding + Deployment（image `firth-pgsql/controlplane:dev`，`imagePullPolicy: IfNotPresent`，env 上述全套，`DATABASE_URL=postgres://firthpgsql:firthpgsql@statedb:5432/firthpgsql`）+ Service `controlplane:8080`。
 
 - [ ] **Step 6: 测试通过，部署，提交**
 
 ```bash
 go test ./internal/... && make deploy-cp
-kubectl -n fly-pgsql port-forward svc/controlplane 8080:8080 &
+kubectl -n firth-pgsql port-forward svc/controlplane 8080:8080 &
 curl -s -X POST localhost:8080/v1/projects -d '{"name":"demo"}'   # 期望 201 JSON
 git add -A && git commit -m "feat: northbound api + controlplane deployment"
 ```
@@ -719,8 +719,8 @@ git add -A && git commit -m "feat: northbound api + controlplane deployment"
 前置（README 化）：`make deploy-storage deploy-cp` 完成、控制面与 statedb 的 port-forward 在测试 TestMain 里自动建（exec kubectl）或要求手工开。流程：
 1. `POST /v1/projects` → 拿到 endpoint_id、password。
 2. `POST /v1/debug/endpoints/{ep}/start` → 拿 pod IP。
-3. `kubectl -n fly-pgsql port-forward pod/compute-<ep> 55433:55433`（测试内 exec），pgx 连 `postgresql://insforge:<pw>@localhost:55433/appdb` → `CREATE TABLE t(x int); INSERT 1,2,3; SELECT count(*)`==3。
-4. 断言 MinIO 有数据：exec `kubectl -n fly-pgsql exec deploy/minio -- ls /data/neon/pageserver/` 非空（或 mc ls）。
+3. `kubectl -n firth-pgsql port-forward pod/compute-<ep> 55433:55433`（测试内 exec），pgx 连 `postgresql://insforge:<pw>@localhost:55433/appdb` → `CREATE TABLE t(x int); INSERT 1,2,3; SELECT count(*)`==3。
+4. 断言 MinIO 有数据：exec `kubectl -n firth-pgsql exec deploy/minio -- ls /data/neon/pageserver/` 非空（或 mc ls）。
 5. `POST /v1/debug/endpoints/{ep}/stop` → pod 消失；再 start → 数据仍在（count==3）。**这一步证明存算分离成立，是 M1 的核心验收。**
 
 - [ ] **Step 2: 跑通**
@@ -749,13 +749,13 @@ set -euo pipefail
 DIR="$(dirname "$0")/../deploy/certs"; mkdir -p "$DIR"; cd "$DIR"
 DOMAIN="db.127-0-0-1.sslip.io"
 openssl genrsa -out ca.key 2048
-openssl req -new -x509 -days 3650 -key ca.key -subj "/CN=fly-pgsql-dev-ca" -out ca.crt
+openssl req -new -x509 -days 3650 -key ca.key -subj "/CN=firth-pgsql-dev-ca" -out ca.crt
 openssl genrsa -out proxy.key 2048
 openssl req -new -key proxy.key -subj "/CN=*.${DOMAIN}" -out proxy.csr
 printf "subjectAltName=DNS:*.%s,DNS:%s\n" "$DOMAIN" "$DOMAIN" > ext.cnf
 openssl x509 -req -days 3650 -in proxy.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
   -extfile ext.cnf -out proxy.crt
-kubectl -n fly-pgsql create secret tls proxy-tls --cert=proxy.crt --key=proxy.key --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n firth-pgsql create secret tls proxy-tls --cert=proxy.crt --key=proxy.key --dry-run=client -o yaml | kubectl apply -f -
 echo "CA: $DIR/ca.crt（psql 用 sslrootcert 指向它可 verify-full）"
 ```
 （执行期验证清单第 4 条的兜底——若 compute_ctl 拒绝空 jwks，在此脚本追加：`openssl genpkey -algorithm Ed25519 -out jwt.key && openssl pkey -in jwt.key -pubout -out jwt.pub`，将公钥转 JWKS JSON 注入 spec builder。）
@@ -766,7 +766,7 @@ echo "CA: $DIR/ca.crt（psql 用 sslrootcert 指向它可 verify-full）"
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
-metadata: { name: proxy, namespace: fly-pgsql }
+metadata: { name: proxy, namespace: firth-pgsql }
 spec:
   replicas: 1
   selector: { matchLabels: { app: proxy } }
@@ -791,7 +791,7 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: proxy, namespace: fly-pgsql }
+metadata: { name: proxy, namespace: firth-pgsql }
 spec: { selector: { app: proxy }, ports: [{ name: pg, port: 4432 }, { name: http, port: 7001 }] }
 ```
 （执行期验证清单第 3 条：若 `cplane-v1` 不被该版本识别，`kubectl logs` 看 clap 报错中列出的合法值，依次试 `control-plane`、`console`。）
@@ -800,7 +800,7 @@ spec: { selector: { app: proxy }, ports: [{ name: pg, port: 4432 }, { name: http
 
 ```bash
 bash scripts/gen-certs.sh && kubectl apply -f deploy/k8s/70-proxy.yaml
-kubectl -n fly-pgsql port-forward svc/proxy 7001:7001 &
+kubectl -n firth-pgsql port-forward svc/proxy 7001:7001 &
 curl -s http://localhost:7001/v1/status && kill %1   # 期望 200
 git add scripts deploy && git commit -m "feat: tls certs + neon proxy deployment"
 ```

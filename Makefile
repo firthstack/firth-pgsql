@@ -1,4 +1,4 @@
-NS := fly-pgsql
+NS := firth-pgsql
 
 .PHONY: test build image deploy-storage deploy-cp certs forward integration
 
@@ -9,7 +9,7 @@ build:
 	CGO_ENABLED=0 go build -o bin/controlplane ./cmd/controlplane
 
 image:
-	docker build -t fly-pgsql/controlplane:dev .
+	docker build -t firth-pgsql/controlplane:dev .
 
 deploy-storage:
 	kubectl apply -f deploy/k8s/00-namespace.yaml -f deploy/k8s/10-minio.yaml \

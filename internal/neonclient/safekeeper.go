@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/insforge/fly-pgsql/internal/lsn"
+	"github.com/insforge/firth-pgsql/internal/lsn"
 )
 
 // SafekeeperClient queries the safekeeper HTTP API (port 7676). The control

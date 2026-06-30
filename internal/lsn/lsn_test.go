@@ -3,7 +3,7 @@ package lsn_test
 import (
 	"testing"
 
-	"github.com/insforge/fly-pgsql/internal/lsn"
+	"github.com/insforge/firth-pgsql/internal/lsn"
 )
 
 func TestParse(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/insforge/fly-pgsql/internal/scram"
+	"github.com/insforge/firth-pgsql/internal/scram"
 )
 
 var verifierRe = regexp.MustCompile(`^SCRAM-SHA-256\$4096:([A-Za-z0-9+/=]+)\$([A-Za-z0-9+/=]+):([A-Za-z0-9+/=]+)$`)

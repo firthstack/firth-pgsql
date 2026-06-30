@@ -1,4 +1,4 @@
-module github.com/insforge/fly-pgsql
+module github.com/insforge/firth-pgsql
 
 go 1.26.4
 

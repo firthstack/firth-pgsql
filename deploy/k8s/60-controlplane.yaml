@@ -2,13 +2,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 rules:
 - apiGroups: [""]
   resources: [pods, configmaps]
@@ -18,7 +18,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -26,13 +26,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   replicas: 1
   selector:
@@ -46,13 +46,13 @@ spec:
       serviceAccountName: controlplane
       containers:
       - name: controlplane
-        image: fly-pgsql/controlplane:dev
+        image: firth-pgsql/controlplane:dev
         imagePullPolicy: IfNotPresent
         env:
         - name: DATABASE_URL
-          value: postgres://flypgsql:flypgsql@statedb:5432/flypgsql
+          value: postgres://firthpgsql:firthpgsql@statedb:5432/firthpgsql
         - name: NAMESPACE
-          value: fly-pgsql
+          value: firth-pgsql
         - name: PAGESERVER_URL
           value: http://pageserver:9898
         - name: PAGESERVER_CONNSTRING
@@ -76,7 +76,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: controlplane
-  namespace: fly-pgsql
+  namespace: firth-pgsql
 spec:
   selector:
     app: controlplane

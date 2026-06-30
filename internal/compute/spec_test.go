@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/insforge/fly-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/compute"
 )
 
 func testParams() compute.SpecParams {

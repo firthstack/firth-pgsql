@@ -14,10 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/insforge/fly-pgsql/internal/api"
-	"github.com/insforge/fly-pgsql/internal/compute"
-	"github.com/insforge/fly-pgsql/internal/neonclient"
-	"github.com/insforge/fly-pgsql/internal/state"
+	"github.com/insforge/firth-pgsql/internal/api"
+	"github.com/insforge/firth-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/neonclient"
+	"github.com/insforge/firth-pgsql/internal/state"
 )
 
 // fakePageserver records calls and can be told to fail.
@@ -129,7 +129,7 @@ func testServer(t *testing.T) (*api.Server, *fakePageserver, *stubWaker, *state.
 		Store:      store,
 		Pageserver: neonclient.NewPageserver(ps.srv.URL),
 		Safekeeper: stubSafekeeper{},
-		Runtime:    compute.NewK8sRuntime(fake.NewClientset(), "fly-pgsql", "img"),
+		Runtime:    compute.NewK8sRuntime(fake.NewClientset(), "firth-pgsql", "img"),
 		Waker:      waker,
 		Cfg: api.Config{
 			Domain:               "db.127-0-0-1.sslip.io",

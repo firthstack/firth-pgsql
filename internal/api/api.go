@@ -12,12 +12,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/insforge/fly-pgsql/internal/compute"
-	"github.com/insforge/fly-pgsql/internal/ids"
-	"github.com/insforge/fly-pgsql/internal/lsn"
-	"github.com/insforge/fly-pgsql/internal/neonclient"
-	"github.com/insforge/fly-pgsql/internal/scram"
-	"github.com/insforge/fly-pgsql/internal/state"
+	"github.com/insforge/firth-pgsql/internal/compute"
+	"github.com/insforge/firth-pgsql/internal/ids"
+	"github.com/insforge/firth-pgsql/internal/lsn"
+	"github.com/insforge/firth-pgsql/internal/neonclient"
+	"github.com/insforge/firth-pgsql/internal/scram"
+	"github.com/insforge/firth-pgsql/internal/state"
 )
 
 // Waker is implemented by internal/wake. The debug start endpoint and the
