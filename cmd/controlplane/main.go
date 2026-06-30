@@ -14,13 +14,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/insforge/firth-pgsql/internal/api"
-	"github.com/insforge/firth-pgsql/internal/compute"
-	"github.com/insforge/firth-pgsql/internal/neonclient"
-	"github.com/insforge/firth-pgsql/internal/proxycontract"
-	"github.com/insforge/firth-pgsql/internal/state"
-	"github.com/insforge/firth-pgsql/internal/suspend"
-	"github.com/insforge/firth-pgsql/internal/wake"
+	"github.com/firthstack/firth-pgsql/internal/api"
+	"github.com/firthstack/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/neonclient"
+	"github.com/firthstack/firth-pgsql/internal/proxycontract"
+	"github.com/firthstack/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/suspend"
+	"github.com/firthstack/firth-pgsql/internal/wake"
 )
 
 func env(key, def string) string {

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/insforge/firth-pgsql/internal/compute"
-	"github.com/insforge/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/state"
 )
 
 // staleAfter is how long a starting/suspending state may go without updates

@@ -1,4 +1,4 @@
-module github.com/insforge/firth-pgsql
+module github.com/firthstack/firth-pgsql
 
 go 1.26.4
 

@@ -14,9 +14,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/insforge/firth-pgsql/internal/compute"
-	"github.com/insforge/firth-pgsql/internal/state"
-	"github.com/insforge/firth-pgsql/internal/wake"
+	"github.com/firthstack/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/wake"
 )
 
 // fakeRuntime is a programmable in-memory Runtime.

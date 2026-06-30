@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/insforge/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/state"
 )
 
 func testPool(t *testing.T) *pgxpool.Pool {

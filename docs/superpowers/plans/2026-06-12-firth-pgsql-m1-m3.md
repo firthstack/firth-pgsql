@@ -17,7 +17,7 @@
 | k8s namespace | `firth-pgsql` |
 | 存储镜像 | `ghcr.io/neondatabase/neon:release-9129`（pageserver/safekeeper/broker/proxy 同一镜像） |
 | compute 镜像 | `ghcr.io/neondatabase/compute-node-v17:release-compute-9073`（compute 走独立 release 轨道，无 release-9129 tag；执行期已验证含 arm64） |
-| Go module | `github.com/insforge/firth-pgsql` |
+| Go module | `github.com/firthstack/firth-pgsql` |
 | 端口 | pageserver 6400(pg)/9898(http)；safekeeper 5454(pg)/7676(http)；broker 50051；compute 55433(pg)/3080(http)；proxy 4432(pg)/7001(http)；控制面 8080；MinIO 9000；statedb 5432 |
 | 域名 | endpoint 域名 `<ep-id>.db.127-0-0-1.sslip.io`（公共 DNS 解析到 127.0.0.1，零配置） |
 | ID 格式 | tenant/timeline = 32 hex；project = `prj` + 12 hex；branch = `br-` + 12 hex；endpoint = `ep-` + 12 hex（proxy 只允许字母数字和 `-`） |
@@ -74,7 +74,7 @@ docker pull ghcr.io/neondatabase/compute-node-v17:release-9129
 
 ```bash
 cd /Users/junwen/Work/InsFg/firth-pgsql
-go mod init github.com/insforge/firth-pgsql
+go mod init github.com/firthstack/firth-pgsql
 go get github.com/jackc/pgx/v5@latest golang.org/x/crypto@latest \
       k8s.io/client-go@latest k8s.io/api@latest k8s.io/apimachinery@latest
 ```

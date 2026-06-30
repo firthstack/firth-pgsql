@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/insforge/firth-pgsql/internal/neonclient"
+	"github.com/firthstack/firth-pgsql/internal/neonclient"
 )
 
 func skServer(t *testing.T, commitLSN string, status int) string {

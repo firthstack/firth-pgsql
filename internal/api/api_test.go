@@ -14,10 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/insforge/firth-pgsql/internal/api"
-	"github.com/insforge/firth-pgsql/internal/compute"
-	"github.com/insforge/firth-pgsql/internal/neonclient"
-	"github.com/insforge/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/api"
+	"github.com/firthstack/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/neonclient"
+	"github.com/firthstack/firth-pgsql/internal/state"
 )
 
 // fakePageserver records calls and can be told to fail.

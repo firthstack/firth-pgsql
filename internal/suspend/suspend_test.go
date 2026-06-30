@@ -15,9 +15,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/insforge/firth-pgsql/internal/compute"
-	"github.com/insforge/firth-pgsql/internal/state"
-	"github.com/insforge/firth-pgsql/internal/suspend"
+	"github.com/firthstack/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/suspend"
 )
 
 type fakeRuntime struct {

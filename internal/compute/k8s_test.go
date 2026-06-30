@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/insforge/firth-pgsql/internal/compute"
+	"github.com/firthstack/firth-pgsql/internal/compute"
 )
 
 func newRuntime() (*compute.K8sRuntime, *fake.Clientset) {

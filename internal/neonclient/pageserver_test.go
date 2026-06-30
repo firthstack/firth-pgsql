@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/insforge/firth-pgsql/internal/neonclient"
+	"github.com/firthstack/firth-pgsql/internal/neonclient"
 )
 
 const (

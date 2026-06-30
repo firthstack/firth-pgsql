@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/insforge/firth-pgsql/internal/state"
+	"github.com/firthstack/firth-pgsql/internal/state"
 )
 
 type Waker interface {

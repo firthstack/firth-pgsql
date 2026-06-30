@@ -3,7 +3,7 @@ package lsn_test
 import (
 	"testing"
 
-	"github.com/insforge/firth-pgsql/internal/lsn"
+	"github.com/firthstack/firth-pgsql/internal/lsn"
 )
 
 func TestParse(t *testing.T) {
